@@ -1,0 +1,1 @@
+{"frames":[],"message":"Error in get_query(\"Queries/co_normal_codificacao.sql\", con) : \n  could not find function \"get_query\"\n"}

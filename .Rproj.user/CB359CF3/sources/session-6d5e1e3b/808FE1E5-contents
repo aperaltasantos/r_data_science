@@ -1,0 +1,341 @@
+---
+title: "Statistical Methods for Spatial Epidemiology
+2018 R Notes: SPDE"
+author: |
+  | Jon Wakefield
+  | Departments of Statistics, University of Washington
+date: "`r Sys.Date()`"
+output:
+  beamer_presentation:
+    keep_tex: yes
+  slidy_presentation: default
+---
+```{r setup, echo=FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+opts_chunk$set(tidy.opts=list(blank=TRUE, width.cutoff=40),cache=TRUE)
+#opts_chunk$set(tidy.opts=list(blank=TRUE, width.cutoff=40), warning=FALSE,message=FALSE,cache=TRUE)
+  #collapse=TRUE, fig.align='center', tidy=TRUE,
+```
+
+
+## Southern Germany Influenza Data
+
+We illustrate various approaches to spatial modeling, using both Gaussian Markov random field (GMRF) and Markovian Gaussian random field (MGRF) models.
+
+These data were analyzed by Paul and Held (2011) and consist of weekly counts of influenza cases in 140 areas of Southern Germany over 2001--2008.
+
+Katie Wilson prepared these notes, and Jon W added to.
+
+##  Southern Germany Influenza Data
+
+We will use aggregated influenza counts over the year 2001.
+
+```{r,collapse=TRUE, fig.show="hide", message=FALSE, warning=FALSE, echo=TRUE}
+library(surveillance)
+library(RColorBrewer)
+data(fluBYBW)
+# Map of disease incidence (per 100000 inhabitants) 
+# for the year 2001
+plot(fluBYBW, type = observed ~ unit, tps = 1:52, total.args = list(),
+     population = fluBYBW@map$X31_12_01 / 100000)
+```
+
+##  Southern Germany Influenza Data
+
+```{r,collapse=TRUE, fig.height=3,fig.width=3.5,fig.align='center', message=FALSE, warning=FALSE, echo=FALSE}
+data(fluBYBW)
+plot(fluBYBW, type = observed ~ unit, tps = 1:52, total.args = list(),
+     population = fluBYBW@map$X31_12_01 / 100000)
+```
+
+## Southern Germany Influenza Data
+
+Form expected numbers with just a single stratum.
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50)}
+obs <- colSums(observed(fluBYBW)[year(fluBYBW) == 2001,])
+pop <- fluBYBW@map$X31_12_01
+p <- sum(obs)/sum(pop)
+expected <- pop * p
+```
+
+
+## Models
+
+The likelihood  is
+$$Y_i| \theta_i \sim \text{Poisson}(E_i \theta_i),$$
+where $Y_i$ are the observed number of influenza cases in region $i$, $E_i$ are the expected number of counts in region $i$, and the linear predictor  $\log(\theta_i)$ will vary over the models we fit:
+\begin{itemize}
+\item Model 1: $\log(\theta_i) = \beta_0+ \epsilon_i$, with $\epsilon_i \sim N(0,\sigma_{\epsilon}^2)$
+\item Model 2: $\log(\theta_i) = \beta_0+S_i+ \epsilon_i$, with $S_i$ spatial (ICAR, a GMRF) and $\epsilon_i \sim N(0,\sigma_{\epsilon}^2)$.
+\item Model 3: $\log(\theta_i) = \beta_0+S_i+ \epsilon_i$, with $S_i$ a MGRF as approximated using SPDE and $\epsilon_i \sim N(0,\sigma_{\epsilon}^2)$.
+\item Model 4: $\log(\theta_i) = \beta_0+S_i+ \epsilon_i$, with $S_i$ a MGRF as approximated using the approach of Brown (2015) and $\epsilon_i \sim N(0,\sigma_{\epsilon}^2)$.
+\end{itemize}
+
+## Non-spatial Model
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=40)}
+library(INLA)
+library(maptools)
+data.inla <- data.frame(obs=obs, pop=pop, expected=expected)
+data.inla$region.unstruct <- 1:nrow(data.inla)
+res.ns <- inla(obs ~ f(region.unstruct, model="iid"),
+               E=expected, family="poisson", data=data.inla,
+               control.predictor=list(compute=TRUE),
+               control.compute=list(dic=TRUE))
+```
+
+
+## Nonspatial model
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50),fig.show="hide"}
+round(res.ns$summary.fixed,3)
+round(res.ns$summary.hyperpar,3)
+#
+dat <- fluBYBW@map
+dat$RR.ns <- res.ns$summary.fitted.values[,1]
+spplot(dat,"RR.ns")
+```
+
+## Non-spatial model: Posterior means of relative risks
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=4.5,echo=FALSE}
+spplot(dat,"RR.ns")
+```
+
+## ICAR + non-spatial model
+
+Now, we consider the same Poisson likelihood but with $\log(\theta_i) = \beta_0 + \epsilon_i + S_i$, $S_i$ is the spatial error and is assumed to follow the ICAR model and $\epsilon_i \sim N(0,\sigma_\epsilon^2)$.
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=40)}
+data.inla$region.struct <- 1:nrow(data.inla)
+res.icar <- inla(obs ~ f(region.unstruct, model="iid") +
+                   f(region.struct, model="besag",graph=neighbourhood(fluBYBW)),
+                 E=expected, family="poisson", data=data.inla,
+                 control.predictor=list(compute=TRUE),
+                 control.compute=list(dic=TRUE))
+```
+
+## ICAR + nonspatial model
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50),fig.show="hide"}
+round(res.icar$summary.fixed,3)
+round(res.icar$summary.hyperpar,3)
+dat$RR.icar <- res.icar$summary.fitted.values[,1]
+spplot(dat,"RR.icar")
+```
+
+## ICAR + nonspatial model: Posterior means of relative risks
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=4.5,echo=FALSE}
+spplot(dat,"RR.icar")
+```
+
+## ICAR + nonspatial model: Spatial random effects
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=4.5,echo=FALSE}
+U.icar <- res.icar$summary.random$region.struct$mean
+dat$U.icar <- U.icar
+spplot(dat,"U.icar")
+```
+
+## Proportion spatial: very little here!
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50)}
+Nareas <- 140; mat.marg <- matrix(NA, nrow=Nareas, ncol=1000)
+m <- res.icar$marginals.random$region.struct
+for(i in 1:Nareas) {
+  u <- m[[i]] ; s <- inla.rmarginal(1000,u);mat.marg[i,] <- s
+}
+var.RRspatial <- mean(apply(mat.marg, 2, var))
+var.RRhet <- inla.emarginal(function(x) 1/x, 
+                            res.icar$marginals.hyperpar$"Precision for region.unstruct")
+var.RRhet
+var.RRspatial
+var.RRspatial/(var.RRspatial + var.RRhet)
+```
+
+## SPDE: Positions of area centroids
+
+```{r,collapse=TRUE, fig.height=4.0,fig.width=4.0,echo=TRUE, fig.align='center'}
+coords <- coordinates(fluBYBW@map)
+plot(fluBYBW@map)
+points(coordinates(fluBYBW@map), pch = 16, col = "blue", cex=.5)
+```
+
+## SPDE
+
+Code adapted from \url{http://www.r-inla.org/examples/tutorials/spde-tutorial}
+
+Creating the mesh.
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50),warning=F}
+library(gpclib)
+maptools::gpclibPermit()
+german.border <- maptools::unionSpatialPolygons(fluBYBW@map,fluBYBW@map@data[,1])
+german.boundary <- inla.sp2segment(german.border)
+german.mesh <- inla.mesh.2d(boundary = german.boundary,                             cutoff=100, max.edge = c(250,600))
+```
+
+## SPDE: The mesh
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=4.5,echo=TRUE, fig.align='center'}
+plot(german.mesh, asp=1, main = "")
+```
+
+## SPDE 
+
+Create the projector matrix $A$ (which links the random field to the observations), define the SPDE model, and define the stack data that includes three effects: the GRF, iid error, and the intercept.
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=40)}
+A <- inla.spde.make.A(german.mesh, loc = coords)
+spde <- inla.spde2.matern(german.mesh, alpha=2) 
+# alpha = v + d/2 where v is the shape parameter in the matern family
+stk.dat <- inla.stack(data=list(y=obs,
+                                pop=pop,
+                                expected=expected),
+                      A = list(A,1), tag='dat',
+                      effects=list(i=1:german.mesh$n,
+                                   data.frame(intercept=rep(1, 140),
+                                   region.unstruct=1:140)))
+```
+
+## SPDE
+
+Fitting the model takes a relatively large amount of time.
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=40)}
+f.spde <- y ~ -1 + intercept + f(i,model=spde) + f(region.unstruct,model="iid")
+res.spde <- inla(f.spde, control.comput=list(dic=TRUE), 
+                 E=expected, family="poisson", 
+                 data=inla.stack.data(stk.dat),
+                 control.predictor=list(A=inla.stack.A(stk.dat),
+                                        compute=TRUE))
+```
+
+
+
+## SPDE: summary of results
+
+\small
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50)}
+round(res.spde$summary.fixed,3)
+round(res.spde$summary.hyperpar,3)
+```
+
+## Comparison of models
+
+Comparison of DIC and estimates for $\beta_0$.
+
+\scriptsize
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=40)}
+c(res.ns$dic$dic,res.icar$dic$dic,res.spde$dic$dic)
+rbind(res.ns$summary.fixed,res.icar$summary.fixed,res.spde$summary.fixed)
+```
+
+
+## SPDE
+
+Random field predictions
+
+\scriptsize
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50)}
+library(ggplot2)
+library(splancs)
+german.bord <- fortify(german.border)
+stepsize <- 25 #this seems to give similar grids
+nxy <- round(c(diff(range(german.bord[,1])), diff(range(german.bord[,2])))/stepsize)
+projgrid <- inla.mesh.projector(german.mesh, xlim=range(german.bord[,1]),  ylim = range(german.bord[,2]), dims=nxy)
+xmean <- inla.mesh.project(projgrid, res.spde$summary.random$i$mean)
+xsd <- inla.mesh.project(projgrid, res.spde$summary.random$i$sd)
+```
+
+
+## SPDE: Random field predictions
+
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=3,echo=FALSE}
+library(lattice)
+german.bord.tmp <- german.bord
+german.bord.tmp$long <- (german.bord[,1] - min(projgrid$x)) / (projgrid$x[2]-projgrid$x[1])
+german.bord.tmp$lat <- (german.bord[,2] - min(projgrid$y)) / (projgrid$y[2]-projgrid$y[1])
+layout(matrix(c(1,2),nrow=1,ncol=2),widths=c(1,1))
+levelplot(xmean, col.regions=topo.colors(99),main="latent field mean", xlab="",ylab="", panel = function(...){
+            panel.levelplot(...)
+            for(id in unique(german.bord.tmp$id)){
+              index <- which(german.bord.tmp$id == id)
+              for(piece in unique(german.bord.tmp$piece[index])){
+                index2 <- intersect(which(german.bord.tmp$piece == piece),index)
+                panel.lines(german.bord.tmp[index2,], col="black")
+              }
+            }
+        })
+levelplot(xsd, col.regions=topo.colors(99), main="latent field SD", xlab="",ylab="", panel = function(...){
+            panel.levelplot(...)
+            for(id in unique(german.bord.tmp$id)){
+              index <- which(german.bord.tmp$id == id)
+              for(piece in unique(german.bord.tmp$piece[index])){
+                index2 <- intersect(which(german.bord.tmp$piece == piece),index)
+                panel.lines(german.bord.tmp[index2,], col="black")
+              }
+            }
+        })
+```
+
+
+## SPDE
+
+Prediction of the response on a grid.
+
+\scriptsize
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50)}
+prdcoo <- projgrid$lattice$loc
+Aprd <- projgrid$proj$A
+stk.prd <- inla.stack(data=list(y=NA), A=list(Aprd,1),
+                      effects=list(i=1:spde$n.spde,
+                                   data.frame(intercept=rep(1, nrow(Aprd)),                                           region.unstruct=1:nrow(Aprd))), tag='prd')
+stk.all <- inla.stack(stk.dat, stk.prd)
+res2.spde <- inla(f.spde, E=expected, family="poisson",  data=inla.stack.data(stk.all),control.predictor=list(A=inla.stack.A(stk.all), compute=TRUE,link=1), quantiles=NULL, control.results=list(return.marginals.random=FALSE,return.marginals.predictor=FALSE))
+```
+
+## Using glgm
+
+\scriptsize
+```{r, message=FALSE, collapse=TRUE, tidy=TRUE,tidy.opts=list(width.cutoff=50), warning=FALSE,fig.show="hide"}
+library(geostatsp)
+data.spdf <- SpatialPointsDataFrame(coords, data.inla)
+res.glgm <- glgm(data.spdf, formula = obs ~ 1+f(region.unstruct, model="iid"), family = "Poisson", E=expected, grid = 102, shape = 1, buffer = 500, priorCI = list( sd=c(0.2, 4),range=c(180,3000)))
+
+rbind(res.ns$summary.fixed,
+      res.icar$summary.fixed,
+      res.spde$summary.fixed,
+      res.glgm$parameters$summary[1,-8])
+par(mfrow=c(1,1))
+plot(res.glgm$raster[["predict.exp"]],col=topo.colors(99))
+plot(fluBYBW@map, add=TRUE)
+```
+
+## Using glgm
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=3,echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+```
+## Using glgm
+
+```{r,collapse=TRUE, fig.height=4.5,fig.width=3,echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+pdf("predict_glgm.pdf")
+par(mfrow=c(1,1))
+plot(res.glgm$raster[["predict.exp"]],col=topo.colors(99))
+plot(fluBYBW@map, add=TRUE)
+dev.off()
+```
+
+\includegraphics[width=8.5cm, height=9cm]{predict_glgm.pdf}

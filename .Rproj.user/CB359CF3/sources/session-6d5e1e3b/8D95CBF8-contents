@@ -1,0 +1,1371 @@
+---
+title: "SmokeData2002-2018"
+author: 
+  author: "Maria Ana Santos"
+  affiliation: " Escola Nacional de Saúde Pública"
+  date: "`r Sys.Date()`"
+format:
+  html:
+    smooth-scroll: true
+    toc: true
+    toc-location: left
+    embed-resources: true
+    number-sections: true
+    code-fold: true
+theme:
+  light: cosmo
+  dark: [cosmo, theme-dark.scss]
+---
+
+## Preparing
+
+## Install Packages
+
+```{r}
+#install.packages("tidyverse")
+#install.packages("haven")
+#install.packages("rio")
+#install.packages("devtools")
+#install("ggplot2")
+#install.packages("usethis")
+#install.packages("devtools")
+#install.packages("esquisse")
+#install.packages("zoo")
+require(devtools)
+#install_version("icd", version = "4.0.9", repos = "http://cran.us.r-project.org", dependencies = TRUE)
+```
+
+```{r}
+library("tidyverse")
+library("dplyr")
+library("haven")
+library("rio")
+library("Linkage")
+library("ggplot2")
+library("devtools")
+library(icd)
+library("lubridate")
+library("magrittr")
+library("zoo")
+```
+
+To carry out this study, a secondary data collection will be made from the annual hospital morbidity data of the Homogeneous Diagnosis Groups (DRG), referring to the years 2002 to 2018, as well as population data that will be obtained through the website of the National Institute of Statistics.
+
+## Loading Database from GDH
+
+Loading database selecting only 6 variables.
+
+Characterizing the variables:
+
+-   hosp_id : hospital identificaction
+
+-   data_entrada: date of the admission on the hospital
+
+-   concelho: municipality of residence -\> renamed as county
+
+-   idade: age ( this is limited only to adults, so we only considered between 18 and 105 years-old)
+
+-   female: if 1 means that is female, if 0 man -\> renamed as sex
+
+-   d1: principal diagnosis at admission
+
+-   death: 1 if the patient died, 0 if is alive when discharge
+
+Durante a análise das verificou-se que na coluna data_entrada temos unidades de observação sem data ou com datas que não correspondem aos anos em estudo, assim fez-se uma limpeza destes dados de modo a apenas incluir o ano em estudo.
+
+```{r}
+df_2002 <- import("2002TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+codesine <- import("pop_2002.csv")
+  codes<-unique(codesine$geodsg)
+  codesdf<-data.frame(codes)
+  var_name<-unique(df_2002$concelho)
+  D <- adist(var_name, codes)
+  colnames(D) <- codes
+  rownames(D) <- var_name 
+  i <- apply(D, 1, which.min) # get closest factor
+  recoded_df <- data.frame(concelho = var_name, recoded = codes[i])%>%
+    mutate(recoded= case_when(
+      concelho=="Ma?o"~"Mação",
+      concelho=="Velas (R.A.A.)"~"Velas",
+      concelho=="GUINE"~NA,
+      concelho=="ANGOLA"~NA,
+      concelho=="CABO VERDE"~NA,
+      concelho=="Ilha do Pico"~NA,
+      concelho=="Ilha de Santa Maria"~NA,
+      concelho=="Ilha de S?o Miguel"~NA,
+      concelho=="Ilha da Graciosa"~NA,
+      concelho=="Ilha Terceira"~NA,	
+      concelho=="Ilha da Madeira"~NA,	
+      concelho==""~NA,
+      .default = recoded))
+
+df_2002recoded<-df_2002 %>%
+    left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2003 <- import("2003TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2003recoded<-df_2003 %>%
+    left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2004 <- import("2004TEMP.csv", encoding="UTF-8")%>%
+  rename(sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2004recoded<-df_2004 %>%
+    left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2005 <- import("2005TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2005recoded<-df_2005 %>%
+   left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2006 <- import("2006TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2006recoded<-df_2006 %>%
+    left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2007 <- import("2007TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2007recoded<-df_2007 %>%
+   left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2008 <- import("2008TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2008recoded<-df_2008 %>%
+    left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2009 <- import("2009TEMP.csv", encoding="UTF-8")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(concelho = iconv(concelho, from="ASCII", to="UTF-8", "")) 
+
+df_2009recoded<-df_2009 %>%
+    left_join(recoded_df)%>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+
+df_2010 <- import("2010TEMP.csv") %>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2011 <- import("2011TEMP.csv") %>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2012 <- import("2012TEMP.csv") %>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2013 <- import("2013TEMP.csv")%>%
+  rename( sex = female) %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sex, d1, death) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sex == 1 ~ "F", 
+    sex == 0 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2002) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+```
+
+From 2014 to 2018 the database as the same variables but with different names and categorization. So the following code is used to make the database uniform across the various years. Changing the variable names to those used between the years 2002 to 2013. This way:
+
+-   hosp_id
+
+-   data_entrada: date of the admission on the hospital
+
+-   concelho: municipality of residence -\> renamed as county
+
+-   idade: age ( this is limited only to adults, so we only considered between 18 and 105 years-old)
+
+-   female = sexo, where, 1 means male and 2 female-\> renamed as sex
+
+-   d1: principal diagnosis at admission
+
+-   death = dsp 1 if the patient died, 0 if is alive when discharge (in the original data base only 20 corresponds to death, the other numbers are other outcomes like transference, discharge, ...)
+
+-   age_group: age group of the patient when is admission to the hospital
+
+Com este código pretendo importar as bases de dados dos GDH restringindo por idade e ordenando por grupos etários. Foram alterados os nomes das variáveis de modo a tornar a base final uniforme e ser mais simples de as juntar. Foram acrescentadas 2 colunas: year e month as bases.
+
+```{r}
+df_2014 <- import("2014TEMP.csv") %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sexo, d1, dsp) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sexo == 1 ~ "M",
+    sexo == 2 ~ "F")) %>%
+  mutate(death = case_when(
+    dsp == 20 ~ 1,
+    dsp == 1 ~ 0, dsp == 2 ~ 0, dsp == 6 ~ 0, dsp == 7 ~ 0, dsp == 13 ~ 0, dsp == 51 ~ 0, dsp == 61 ~ 0, dsp == 63 ~ 0)) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+   filter(year >= 2014) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+df_2015 <- import("2015TEMP.csv") %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sexo, d1, dsp) %>%
+  filter(idade >= 15) %>%
+  mutate(sex = case_when(
+    sexo == 1 ~ "M",
+    sexo == 2 ~ "F")) %>%
+  mutate(death = case_when(
+    dsp == 20 ~ 1,
+    dsp == 1 ~ 0, dsp == 2 ~ 0, dsp == 6 ~ 0, dsp == 7 ~ 0, dsp == 13 ~ 0, dsp == 51 ~ 0, dsp == 61 ~ 0, dsp == 63 ~ 0)) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+   filter(year >= 2014) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>%
+  arrange(age_group)
+
+#2016
+df_2016 <- import("dados2016.csv")  %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sexo, cod_diagnostico,tipo_p_s, dsp) %>%
+  filter(idade >= 15) %>%
+  filter(tipo_p_s == "P") %>%
+  mutate(sex = case_when(
+    sexo == 2 ~ "F", 
+    sexo == 1 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2016) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(death = case_when(
+    dsp == 20 ~ 1,
+    dsp == 1 ~ 0, dsp == 2 ~ 0, dsp == 6 ~ 0, dsp == 7 ~ 0, dsp == 13 ~ 0, dsp == 51 ~ 0, dsp == 61 ~ 0, dsp == 63 ~ 0)) %>%
+  rename(d1 = cod_diagnostico) %>%
+  select( hosp_id, year, month, age_group, sex, d1, death) %>% 
+  arrange(age_group)
+
+df_2017 <- import("dados2017.csv") %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sexo, cod_diagnostico,tipo_p_s, dsp) %>%
+  filter(idade >= 15) %>%
+  filter(tipo_p_s == "P") %>%
+  mutate(sex = case_when(
+    sexo == 2 ~ "F", 
+    sexo == 1 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2016) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(death = case_when(
+    dsp == 20 ~ 1,
+    dsp == 1 ~ 0, dsp == 2 ~ 0, dsp == 6 ~ 0, dsp == 7 ~ 0, dsp == 13 ~ 0, dsp == 51 ~ 0, dsp == 61 ~ 0, dsp == 63 ~ 0)) %>%
+  rename(d1 = cod_diagnostico) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>% 
+  arrange(age_group)
+  
+
+df_2018 <- import("dados2018.csv") %>%
+  select(hosp_id, data_entrada, distrito, concelho, freguesia, idade, sexo, cod_diagnostico,tipo_p_s, dsp) %>%
+  filter(idade >= 15) %>%
+  filter(tipo_p_s == "P") %>%
+  mutate(sex = case_when(
+    sexo == 2 ~ "F", 
+    sexo == 1 ~ "M")) %>%
+  mutate(data = parse_date_time(data_entrada, orders = c("Ymd", "mdY", "dmY", "Y-m-d")),
+         month = month(data), 
+         year = year(data))  %>%
+  filter(year >= 2016) %>%
+  mutate(age_group = case_when(
+    idade < 30 ~ "15 - 29",
+    idade < 50 ~ "30 - 49",
+    idade < 65 ~ "50 - 64",
+    idade < 85 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(death = case_when(
+    dsp == 20 ~ 1,
+    dsp == 1 ~ 0, dsp == 2 ~ 0, dsp == 6 ~ 0, dsp == 7 ~ 0, dsp == 13 ~ 0, dsp == 51 ~ 0, dsp == 61 ~ 0, dsp == 63 ~ 0)) %>%
+  rename(d1 = cod_diagnostico) %>%
+  select(hosp_id, year, month, age_group, sex, d1, death) %>% 
+  arrange(age_group)
+```
+
+### Merging de data from 2002 to 2013
+
+Nesta secção juntamos todas as bases de dados dos GDH de 2002 a 2013
+
+```{r}
+df_merge0213 <- rbind(df_2002recoded, df_2003recoded, df_2004recoded, df_2005recoded, df_2006recoded, df_2007recoded, df_2008recoded, df_2009recoded, df_2010, df_2011, df_2012, df_2013)
+```
+
+### Merging all data
+
+Aqui juntamos os dados de todos os anos em estudo
+
+```{r}
+GDHdata <- rbind(df_merge0213, df_2014, df_2015) %>%
+  filter(year <= 2018)
+
+summary(GDHdata)
+```
+
+### ICD-9 and ICD-10 codes
+
+This table is used to make the correspondence of the codification from ICD-9 to ICD-10 of the pathologies covered in this study, given that on 1 January 2017 there was a change in the codification used in Portugal.
+
+-   EAM : enfarte agudo do miocárdio
+
+-   AVC : acidente vascular cerebral
+
+-   Asma : asma
+
+-   IRB : insuficiência respiratória baixa
+
+-   IRC : insuficiência respiratória crónica
+
+    |      | Patology                                                                           | ICD-9               | ICD-10                  |
+    |----------------|------------------------|----------------|----------------|
+    | EAM  | Enfarte Agudo do Miocárdio                                                         | 410                 | I21                     |
+    | EAM  | Insuficiência cardiaca isquémica                                                   | 411-414             | I20-I25                 |
+    | EAM  | STEMI                                                                              | 410                 | I210-I213               |
+    | EAM  | NSTEMI                                                                             | 410                 | I214                    |
+    | EAM  | Angina Instável                                                                    | 411- 413            | I20                     |
+    | EAM  | Insuficiência cardiaca congestiva                                                  | 428-429             | I50                     |
+    | EAM  | Doenças hipertensivas                                                              | 401-405             | I10, I11, I12, I13, I15 |
+    | AVC  | Acidente vascular cerebral hemorrágico                                             | 430-432             | I60-I62                 |
+    | AVC  | Acidente vascular cerebral isquémico                                               | 433-434             | I63, I65 e I66          |
+    | AVC  | Acidente vascular cerebral não especificado                                        | 436-437             | I64                     |
+    | Asma | Asma                                                                               | 493                 | J45-J46                 |
+    | IRB  | Pneumonia viral, não especificada noutro lugar                                     | 480                 | J12                     |
+    | IRB  | Pneumonia devido a Streptococcus pneumoniae                                        | 481                 | J13                     |
+    | IRB  | Pneumonia por Haemophilus influenzae                                               | 482                 | J14                     |
+    | IRB  | Pneumonia bacteriana, não especificada noutro lugar                                | 482                 | J15                     |
+    | IRB  | Pneumonia devido a outros organismos infeciosos, não classificados noutros lugares | 483                 | J16                     |
+    | IRB  | Pneumonia, organismo indeterminado                                                 | 481,485,486,514     | J18                     |
+    | IRB  | Bronquite Aguda                                                                    | 041,079,466         | J20                     |
+    | IRB  | Infeção respiratória inferior aguda não especificada                               | 519.8               | J22                     |
+    | IRC  | Bronquite, não especificada como aguda ou crónica                                  | 490 - 494           | J40                     |
+    | IRC  | Bronquite crónica simples e mucopurulenta                                          | 491.0, .1, .18      | J41                     |
+    | IRC  | Bronquite crónica não especificada                                                 | 491.9               | J42                     |
+    | IRC  | Enfisema                                                                           | 492                 | J43                     |
+    | IRC  | Outras doenças pulmonares obstrutivas crónicas                                     | 491, 493, 495 e 496 | J44, J84                |
+    | IRC  | Bronquiectasias                                                                    | 494                 | J47                     |
+
+### Create a column with only the diagnoses of interest
+
+```{r}
+strings_to_filter <- c("EAM", "AVC", "Asma", "IRB", "IRC")
+
+pattern <- paste(strings_to_filter, collapse = "|")
+
+BASE <- GDHdata %>%
+   mutate(diagnóstico = case_when(
+    substr(d1, 1,3) %in% c("410", "411", "412", "413", "414", "428", "429", "401", "402", "403", "404", "405","I21", "I20", "I22", "I23", "I24", "I25", "I50", "I10", "I11", "I12", "I13", "I15") ~ "EAM", 
+    substr(d1, 1,3) %in% c("430", "431", "432", "433", "434", "436", "437","I60", "I61", "I62", "I63", "I65", "I66", "I64") ~ "AVC",
+    substr(d1, 1,3) %in% c("493","J45", "J46" ) ~ "Asma",
+    substr(d1, 1,3) %in% c("480", "481", "482", "483", "485", "486", "514", "041", "079", "466", "5198", "J12", "J13", "J14", "J15", "J16", "J18", "J20", "J22") ~ "IRB",
+    substr(d1, 1,3) %in% c("490", "491", "492", "493", "494", "495", "496",  "J40", "J41", "J42", "J43", "J44", "J84", "J47" ) ~ "IRC",
+    TRUE ~ "outros")) %>%
+  filter(diagnóstico != "outros") %>%
+  select(year, month, hosp_id, sex, age_group, diagnóstico, death)
+
+# Agregando os dados por ano e diagnóstico
+#pdiag <- BASE %>%
+  #group_by(year) %>%
+  #summarize(total_diagnostic = sum(diagnóstico))
+
+# Removendo as linhas com valores ausentes
+#pdiag2 <- ggplot(data = pdiag, aes(x = year, y = total_diagnostic)) +
+  #geom_line() +
+  #labs(x = "Ano", y = "Total de diagnósticos", title = "Total de diagnósticos por ano")
+
+#pdiag2
+```
+
+## Loading Database from INE
+
+### Number of inhabitants per county/year
+
+Characterizing the variables:
+
+-   geocod : correpondingo to countys
+
+-   dim_3\_t : sex
+
+-   dim_4\_t : group age, starting with 20-24, ...., 85 - and more (14).
+
+-   valor: number of residents
+
+No seguinte código pretende-se importar os dados do INE de 2002 a 2019 para se puder calcular a população média dos concelhos para calculo da incidência das patologias em estudo. De modo a uniformizar a base, certas colunas foram renomeadas e as idades restringidas.
+
+```{r}
+ine_2002 <- import("pop_2002.csv") %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2002) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+            
+
+ine_2003 <- import("pop_2003.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2003) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+
+ine_2004 <- import("pop_2004.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2004) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+
+ine_2005 <- import("pop_2005.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2005) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+
+ine_2006 <- import("pop_2006.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2006) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+
+ine_2007 <- import("pop_2007.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2007) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+
+ine_2008 <- import("pop_2008.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2008) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group))
+
+ine_2009 <- import("pop_2009.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2009) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2010 <- import("pop_2010.csv") %>% 
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2010) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2011 <- import("pop_2011.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2011) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2012 <- import("pop_2012.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2012) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2013 <- import("pop_2013.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2013) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2014 <- import("pop_2014.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2014) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2015 <- import("pop_2015.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2015) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2016 <- import("pop_2016.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2016) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2017 <- import("pop_2017.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2017) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2018 <- import("pop_2018.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+  filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2018) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+
+ine_2019 <- import("pop_2019.csv")  %>%
+  filter(dim_4 != "11") %>%
+  filter(dim_4 != "12") %>%
+  filter(dim_4 != "21") %>%
+  filter(dim_4 != "T") %>%
+  rename(sex = dim_3_t) %>%
+  filter(sex != "HM") %>%
+  mutate(sex = case_when(
+    sex == "M" ~ "F",
+    sex == "H" ~ "M")) %>%
+filter(geodsg=="Continente") %>%
+  mutate(age_group = case_when(
+    dim_4 == 22 ~ "15 - 29",
+    dim_4 == 31 ~ "15 - 29",
+    dim_4 == 32 ~ "15 - 29",
+    dim_4 == 41 ~ "30 - 49",
+    dim_4 == 42 ~ "30 - 49",
+    dim_4 == 51 ~ "30 - 49",
+    dim_4 == 52 ~ "30 - 49",
+    dim_4 == 61 ~ "50 - 64",
+    dim_4 == 62 ~ "50 - 64",
+    dim_4 == 71 ~ "50 - 64",
+    dim_4 == 72 ~ "65 - 84",
+    dim_4 == 81 ~ "65 - 84",
+    dim_4 == 82 ~ "65 - 84",
+    dim_4 == 91 ~ "65 - 84",
+    TRUE ~ "85 +")) %>%
+  mutate(year = 2019) %>%
+  summarise(valor= sum(valor), .by = c(year, sex, age_group)) 
+```
+
+### Merge all data from INE
+
+```{r}
+#juntar todos os anos do INE
+INE <- rbind(ine_2002, ine_2003, ine_2004, ine_2005, ine_2006, ine_2007, ine_2008, ine_2009, ine_2010, ine_2011, ine_2012, ine_2013, ine_2014, ine_2015)
+```
+
+## Evolução Internamentos
+
+Evolução internamentos
+
+```{r}
+BASEFINAL <- BASE %>%
+  summarise(admissions_sum = n(), death_sum = sum(death), .by = c(year, month, sex, age_group, diagnóstico))
+
+BASEFINAL2 <- BASE %>%
+  summarise(admissions_sum = n(), death_sum = sum(death), .by = c(year, diagnóstico)) 
+
+#pop total por ano
+INEsum <- INE %>%
+  summarise(pop_sum = sum(valor), .by = c(year))
+
+
+PopMR <- INEsum[c("year", "pop_sum")]
+soma_movel <- rollapply(PopMR$pop_sum, width = 2, FUN = sum, align = "left")
+POPR <- soma_movel/2
+
+
+pd <- ggplot(data = BASEFINAL2) +
+  geom_bar(aes(x = year, y = admissions_sum), stat = "identity") +
+  labs(x = "Year", y = "Nº de Internamentos", title = "Evolução do nº de internamentos, em Portugal entre 2002 e 2015")
+
+
+pd
+```
+
+## Merge data from GDH and INE
+
+```{r}
+#juntar GDH e INE
+
+BASEFINAL <- merge(BASEFINAL, INE, by = c("year", "sex", "age_group"))
+
+BASEFINAL2 <- merge(BASEFINAL2, INEsum, .by = c("year"))
+```
+
+```{r}
+#BaseFinal <- group_by("year", "hosp_id", "sex", "age_group", "diagnóstico", "death")
+```
+
+## Creating a dichotomus variable - before and after the tabacco law
+
+Nova variável:
+
+A lei do Tabaco entrou em vigor a 1 de janeiro de 2008 e a sua reformulação a 1 de janeiro de 2016.
+
+0 - antes de 2008
+
+1 - 2008 em diante
+
+```{r}
+BASEFINAL <- BASEFINAL %>%
+  mutate(law = ifelse(year > 2007, "1", "0"))
+```
+
+## Incidência total e por patologia
+
+Calculo da incidência de internamentos pelas patologias em estudo.
+
+```{r}
+incidencia_df <- mutate(BASEFINAL, incidencia = admissions_sum / valor * 1000)
+
+incidencia_df2 <- mutate(BASEFINAL2, incidencia = admissions_sum / pop_sum * 1000)
+
+```
+
+Criação de df por diagnóstico para times series
+
+```{r}
+BASEanosfinal <- incidencia_df2 %>%
+  mutate(law = ifelse(year > 2007, "1", "0"),
+         time= year-2002,
+         time_law=case_when(
+           law==0 ~ 0,
+           law==1 ~ (year-2008)
+         )) %>%
+  rename(internamentos = admissions_sum) %>%
+  select(time, diagnóstico, incidencia, law, time_law, year)
+
+BaseAsma <- BASEanosfinal %>%
+  filter( diagnóstico == "Asma")
+
+BaseEAM <- BASEanosfinal %>%
+  filter( diagnóstico == "EAM")
+
+BaseAVC <- BASEanosfinal %>%
+  filter( diagnóstico == "AVC")
+
+BaseIRB <- BASEanosfinal %>%
+  filter( diagnóstico == "IRB")
+
+BaseIRC <- BASEanosfinal %>%
+  filter( diagnóstico == "IRC")
+
+
+p <- ggplot(data=BASEanosfinal) +
+  geom_line(aes(x=year, y=incidencia, color=diagnóstico)) +
+  labs(x = "Year", y = "Incidência de Diagnósticos/1000 habitantes", title = "Evolução da Incidência dos  Diagnósticos em estudo, em Portugal entre 2002 e 2015")
+
+p
+```
+
+## Regression
+
+Asma
+
+```{r}
+
+formula <- incidencia ~ time
+formula1 <- incidencia ~ time+law+law:time_law
+
+
+model<- lm(formula,BaseAsma)
+library(broom)
+
+tidy(model, exponentiate = TRUE)
+
+model_law<- lm(formula1,BaseAsma)
+library(broom)
+
+tidy(model_law, exponentiate = TRUE)
+
+```
+
+EAM
+
+```{r}
+formula <- incidencia ~ time
+formula1 <- incidencia ~ time+law+law:time_law
+
+
+model1<- lm(formula,BaseEAM)
+library(broom)
+
+tidy(model1, exponentiate = TRUE)
+
+model_law1<- lm(formula1,BaseEAM)
+library(broom)
+
+tidy(model_law1, exponentiate = TRUE)
+
+```
+
+AVC
+
+```{r}
+formula <- incidencia ~ time
+formula1 <- incidencia ~ time+law+law:time_law
+
+
+model2<- lm(formula,BaseAVC)
+library(broom)
+
+tidy(model2, exponentiate = TRUE)
+
+model_law2<- lm(formula1,BaseAVC)
+library(broom)
+
+tidy(model_law2, exponentiate = TRUE)
+
+```
+
+IRB
+
+```{r}
+formula <- incidencia ~ time
+formula1 <- incidencia ~ time+law+law:time_law
+
+
+model3<- lm(formula,BaseIRB)
+library(broom)
+
+tidy(model3, exponentiate = TRUE)
+
+model_law3<- lm(formula1,BaseIRB)
+library(broom)
+
+tidy(model_law3, exponentiate = TRUE)
+
+```
+
+IRC
+
+```{r}
+formula <- incidencia ~ time
+formula1 <- incidencia ~ time+law+law:time_law
+
+
+model4<- lm(formula,BaseIRC)
+library(broom)
+
+tidy(model4, exponentiate = TRUE)
+
+model_law4<- lm(formula1,BaseIRC)
+library(broom)
+
+tidy(model_law4, exponentiate = TRUE)
+
+```
+
+## Time Series
+
+```{r}
+
+```

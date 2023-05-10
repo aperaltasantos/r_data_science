@@ -1,0 +1,662 @@
+---
+title: "Codificação"
+author: "José Francisco Loff"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+
+```{r configuracao, echo = FALSE}
+
+###### ANOS EM ANÁLISE #######
+###
+### Definir os anos para os quais se quer analisar a evolução da codificação.
+### Pode ser um ano único, p.ex.
+###
+###   anos_analise <- 2016
+###
+### ou um conjunto de anos, p.ex.
+###
+###   anos_analise <- c(2016, 2017)
+
+anos_analise <- c(2021)
+```
+
+```{r init, echo = FALSE, message = FALSE, warning = FALSE, error = FALSE, results = 'hide'}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, error = FALSE, cache = FALSE, tidy.opts=list(keep.blank.line=TRUE, width.cutoff=140), options(width=120))
+
+require(ROracle)
+library(lubridate)
+library(ggplot2)
+library(plyr)
+library(grid)
+library(gridExtra)
+library(scales)
+library(DT)
+```
+
+```{r funcs}
+f.frac_cod <- function() {
+
+  # Retirar datas anteriores a 01-Set (não são fiáveis, por erro no SICO)
+  cut_date <- as.Date("2015-09-01")
+  d.cod$DATA_CODIFICADOR[d.cod$DATA_CODIFICADOR < cut_date] <- NA
+
+  f.ff <- function(d.cod) {
+    # Contabilizar todos os codificados até à data de corte
+    baseline <- data.frame(Data = cut_date - 1,
+                           Codificados = sum(is.na(d.cod$DATA_CODIFICADOR) &
+                                             d.cod$CAUSA_BASICA == "Sim"))
+    
+    # Contabilizar os codificados após a data de corte
+    t.cods <- table(d.cod$DATA_CODIFICADOR)
+    if (nrow(t.cods) > 0) {
+      cods <- data.frame(t.cods)
+      cods$Var1 <- as.Date(cods$Var1)
+      cods <- cods[order(cods$Var1), ]
+      names(cods) <- c("Data", "Codificados")
+    } else {
+      cods <- data.frame(Data = as.Date(character(0)),
+                         Codificados = numeric(0))
+    }
+    # Juntar a as duas listas
+    cods <- rbind(baseline, cods)
+    cods
+    
+    # Contabilizar os emitidos
+    t.emits <- table(as.Date(d.cod$DATA_CRIACAO))
+    if (nrow(t.emits) > 0) {
+      emits <- data.frame(t.emits)
+      emits$Var1 <- as.Date(emits$Var1)
+      emits <- emits[order(emits$Var1), ]
+      names(emits) <- c("Data", "Emitidos")
+    } else {
+      emits <- data.frame(Data = as.Date(character(0)),
+                          Codificados = numeric(0))
+    }
+    
+    # Juntar as duas tabelas
+    x <- merge(emits, cods, all = TRUE)
+    x$Codificados[is.na(x$Codificados)] <- 0
+    x$Emitidos[is.na(x$Emitidos)] <- 0
+    x$Emitidos <- cumsum(x$Emitidos)
+    x$Codificados <- cumsum(x$Codificados)
+    x$FracCod <- (x$Emitidos - x$Codificados) / x$Emitidos
+    x
+  }
+
+  by_cod <- ddply(d.cod, .(CODIFICADORA, ANO), f.ff)
+  by_all <- ddply(d.cod, .(ANO), f.ff)
+  by_all$CODIFICADORA <- "Global"
+
+  rbind.fill(by_cod, by_all)
+}
+
+f.alineas <- function() {
+  with(d.anc[d.anc$Missing == TRUE & d.anc$Codificado == TRUE, ],
+    table(CODIFICADORA, ANO)
+    )
+}
+
+f.stat_mes <- function() {
+  cod_mes <- ddply(d.cod, .(ANO, MES), summarise,
+                   Sim = sum(CAUSA_BASICA == "Sim"),
+                   Nao = sum(CAUSA_BASICA == "Nao"),
+                   Total = Sim + Nao,
+                   Percentagem = Sim / Total)
+
+  datatable(cod_mes, style = 'bootstrap', class = 'condensed', rownames = FALSE,
+            width = 600, options = list(pageLength = nrow(cod_mes), dom = 't'),
+            colnames = c("Ano" = 1, "Mês" = 2, "Codificados" = 3, "Por codificar" = 4, "% codificada" = 6),
+           ) %>% formatPercentage(6)
+}
+
+f.stat_cod <- function(ano) {
+  cod_codif <- ddply(d.cod, .(ANO, CODIFICADORA), summarise,
+                   Sim = sum(CAUSA_BASICA == "Sim"),
+                   Nao = sum(CAUSA_BASICA == "Nao"),
+                   Total = Sim + Nao,
+                   Percentagem = Sim / Total)
+
+  datatable(cod_codif, style = 'bootstrap', class = 'condensed', rownames = FALSE,
+            width = 600, options = list(pageLength = nrow(cod_codif), dom = 't'),
+            colnames = c("Ano" = 1, "Codificadora" = 2, "Codificados" = 3, "Por codificar" = 4, "% codificada" = 6),
+           ) %>% formatPercentage(6)
+}
+
+f.plot_pred_cod <- function(fc, dias = NULL) {
+
+  do_predict <- function(dados) {
+
+    codlm <- lm(as.numeric(Data) ~ FracCod, data = dados)
+    zeros <- predict(codlm, data.frame(FracCod = 0), interval = "predict")
+    zeros_date <- as.Date(zeros, origin = as.Date("1970-01-01"))
+    zeros_gap <- pmin(30, floor((zeros_date[1] - today()) / 3))
+    zeros_date2 <- zeros_date + zeros_gap
+    first_cod <- min(dados$Data)
+    last_cod <- max(dados$Data)
+    lbl <- sprintf("Final previsto: %s\n(entre %s e %s)",
+                   zeros_date2[1], zeros_date2[2], zeros_date2[3])
+    return(data.frame(zeros,
+                      Fit = zeros_date[1], lbl, slope = 1/coef(codlm)[2],
+                      intercept = - coef(codlm)[1] / coef(codlm)[2],
+                      first_cod, last_cod))
+  }
+
+  fc <- na.omit(subset(fc, CODIFICADORA != "Global"))
+  if (!is.null(dias)) fc <- subset(fc, Data >= Sys.Date() - dias)
+
+  fffccc <- ddply(fc, .(ANO, CODIFICADORA), summarise,
+                  PorCodificar = min(FracCod, na.rm = TRUE),
+                  Key = paste0(CODIFICADORA[1], ANO[1]))
+  excluir <- fffccc$Key[fffccc$PorCodificar %in% c(0, 1)]
+  fc <- subset(fc, !paste0(CODIFICADORA, ANO) %in% excluir)
+
+  zeros <- ddply(fc, .(ANO, CODIFICADORA), do_predict)
+  zeros <- zeros[order(-zeros$upr), ]
+  zeros$Fit[zeros$Fit > (Sys.Date() + 365 * 2)] <- NA
+  zeros <- ddply(zeros, .(ANO), mutate,
+                 MinX = min(as.numeric(first_cod)),
+                 HJust = (as.numeric(Fit) - MinX) / (max(as.numeric(Fit), na.rm = TRUE) - MinX),
+                 FitX = as_date((as.numeric(max(c(last_cod, Fit), na.rm = TRUE)) + MinX) / 2))
+  zeros$LabelX[zeros$LabelX > (Sys.Date() + 365 * 2)] <- zeros$last_cod[zeros$LabelX > (Sys.Date() + 365 * 2)]
+  zeros$FitX[!is.na(zeros$Fit)] <- NA
+  zeros[zeros$slope > 0, c("lbl", "Fit", "FitX", "slope")] <- NA
+  zeros <- subset(zeros, !paste0(CODIFICADORA, ANO) %in% excluir)
+
+  if (nrow(fc) == 0) return(invisible())
+
+  ggplot(na.omit(fc), aes(x = Data, y = FracCod, colour = CODIFICADORA)) +
+    geom_step() +
+    geom_abline(aes(slope = slope, intercept = intercept, colour = CODIFICADORA),
+                data = zeros, linetype = 2) +
+    geom_segment(aes(x = Fit, xend = Fit, y = 0.5, yend = 0.1),
+                 data = zeros, colour = "grey50", arrow = arrow(length = unit(8, "pt"))) +
+    geom_label(aes(x = Fit, y = 0.7, label = lbl, hjust = HJust), data = zeros, colour = "grey50", size = 3) +
+    geom_label(aes(x = FitX, y = 0.7, label = lbl, hjust = 0.5), data = zeros, colour = "grey50", size = 3) +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+    facet_grid(CODIFICADORA ~ ANO, scales = "free_x") +
+    theme_bw() + theme(legend.position = "none") +
+    labs(y = "Por codificar")
+
+}
+
+f.plot_pred_global <- function(fc, dias = NULL) {
+
+  do_predict <- function(dados) {
+
+    codlm <- lm(as.numeric(Data) ~ FracCod, data = dados)
+    zeros <- predict(codlm, data.frame(FracCod = 0), interval = "predict")
+    zeros_date <- as.Date(zeros, origin = as.Date("1970-01-01"))
+    zeros_gap <- pmin(30, floor((zeros_date[1] - today()) / 3))
+    zeros_date2 <- zeros_date + zeros_gap
+    first_cod <- min(dados$Data)
+    last_cod <- max(dados$Data)
+    lbl <- sprintf("Final previsto: %s\n(entre %s e %s)",
+                   zeros_date2[1], zeros_date2[2], zeros_date2[3])
+    return(data.frame(zeros,
+                      Fit = zeros_date[1], lbl, slope = 1/coef(codlm)[2],
+                      intercept = - coef(codlm)[1] / coef(codlm)[2],
+                      first_cod, last_cod))
+  }
+
+  fc <- na.omit(subset(fc, CODIFICADORA == "Global"))
+  if (!is.null(dias)) fc <- subset(fc, Data >= Sys.Date() - dias)
+
+  fffccc <- ddply(fc, .(ANO), summarise,
+                  PorCodificar = min(FracCod, na.rm = TRUE))
+  excluir <- fffccc$ANO[fffccc$PorCodificar %in% c(0, 1)]
+  fc <- subset(fc, !ANO %in% excluir)
+
+  zeros <- ddply(fc, .(ANO), do_predict)
+  zeros <- zeros[order(-zeros$upr), ]
+  zeros$Fit[zeros$Fit > (Sys.Date() + 365 * 2)] <- NA
+  zeros <- ddply(zeros, .(ANO), mutate,
+                 MinX = min(as.numeric(first_cod)),
+                 HJust = (as.numeric(Fit) - MinX) / (max(as.numeric(Fit), na.rm = TRUE) - MinX),
+                 FitX = as_date((as.numeric(max(c(last_cod, Fit), na.rm = TRUE)) + MinX) / 2))
+  zeros$LabelX[zeros$LabelX > (Sys.Date() + 365 * 2)] <- zeros$last_cod[zeros$LabelX > (Sys.Date() + 365 * 2)]
+  zeros$FitX[!is.na(zeros$Fit)] <- NA
+  zeros[zeros$slope > 0, c("lbl", "Fit", "FitX", "slope")] <- NA
+  zeros <- subset(zeros, !ANO %in% excluir)
+
+  if (nrow(fc) == 0) return(invisible())
+
+  ggplot(na.omit(fc), aes(x = Data, y = FracCod)) +
+    geom_step() +
+    geom_abline(aes(slope = slope, intercept = intercept),
+                data = zeros, linetype = 2) +
+    geom_segment(aes(x = Fit, xend = Fit, y = 0.5, yend = 0.1),
+                 data = zeros, colour = "grey50", arrow = arrow(length = unit(8, "pt"))) +
+    geom_label(aes(x = Fit, y = 0.7, label = lbl, hjust = HJust), data = zeros, colour = "grey50", size = 3) +
+    geom_label(aes(x = FitX, y = 0.7, label = lbl, hjust = 0.5), data = zeros, colour = "grey50", size = 3) +
+    scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
+    facet_grid(. ~ ANO, scales = "free_x") +
+    theme_bw() + theme(legend.position = "none") +
+    labs(y = "Por codificar")
+
+}
+
+f.plot_bic_ra <- function() {
+  mm <- ddply(subset(d.anc, Codificado == FALSE),
+              .(ANO, CODIFICADORA, BIC), summarise,
+              N = length(CODIFICADORA))
+  names(mm) <- gsub("^BIC$", "YN", names(mm))
+  mm$Extra <- rep("BIC", nrow(mm))
+
+  nn <- ddply(subset(d.anc, Codificado == FALSE),
+              .(ANO, CODIFICADORA, RA), summarise,
+              N = length(CODIFICADORA))
+  names(nn) <- gsub("^RA$", "YN", names(nn))
+  nn$Extra <- rep("RA", nrow(nn))
+
+  pp <- rbind(mm, nn)
+  if (nrow(pp) == 0) return("")
+  pp$YN <- factor(pp$YN, levels = c(FALSE, TRUE), labels = c("Sem", "Com"))
+
+  ggplot(pp, aes(x = Extra, y = N, fill = interaction(YN, Extra, sep = " "))) +
+  stat_sum(geom = "bar") +
+  geom_text(aes(label = N), vjust = -0.5, show.legend = FALSE) +
+  facet_grid(ANO ~ CODIFICADORA) +
+  scale_fill_manual(values = c("#F927134D", "#F92713FF", "#5A7A834D", "#5A7A83FF")) +
+  guides(size = "none") +
+  theme_bw() + theme(axis.title.x = element_blank(),
+                     axis.text.x = element_text(angle = 90),
+                     legend.position = "bottom") +
+  expand_limits(y = max(c(mm$N, nn$N)) * 1.15) +
+  labs(y = "CO por codificar", fill = "")
+}
+
+f.plot_alineas <- function() {
+  d.alineas_plot <- ddply(subset(d.anc, Codificado == FALSE),
+                          .(ANO, CODIFICADORA, NAlineas), summarise,
+                          N = length(CODIFICADORA),
+                          BIC = sum(BIC),
+                          RA = sum(RA))
+  d.alineas_plot$NAlineas <- factor(d.alineas_plot$NAlineas)
+
+  if (nrow(d.alineas_plot) == 0) return("")
+
+  ggplot(d.alineas_plot,
+                aes(x = NAlineas, fill = CODIFICADORA, y = N)) +
+         stat_sum(geom="bar") +
+         geom_text(aes(label = N), vjust = -0.5) +
+         facet_grid(CODIFICADORA ~ ANO) +
+         theme_bw() + theme(legend.position = "none") +
+         expand_limits(y = max(d.alineas_plot$N) * 1.15) +
+         labs(x = "Alíneas preenchidas", y = "CO por codificar")
+}
+
+get_query <- function(query_file, db_con) {
+  qry <- readChar(query_file, file.info(query_file)$size)
+	qry <- gsub("****", paste(anos_analise, collapse = ","), qry, fixed = TRUE)
+
+  dbsq <- dbSendQuery(qry, conn = db_con)
+  
+  result <- dbFetch(dbsq)
+  dbClearResult(dbsq)
+  return(result)
+}
+
+f.get_data_file <- function(anos) {
+	# Para evitarmos o acesso SQL têm de ser cumpridas duas condições:
+	# 1. Tem de existir um ficheiro de dados referente ao ano em causa
+	# 2. Esse ficheiro tem de ser posterior à última sincronização da base de
+	#    dados a que temos acesso
+
+	data_files <- list.files('.', pattern = paste0("^Codificacao_", paste(anos, collapse = "-"), "_\\d{4}-\\d{2}-\\d{2}\\.RData$"))
+
+	if (length(data_files) == 0) {
+		return(NULL)
+	} else {
+		dates <- as.Date(gsub(".*(\\d{4}-\\d{2}-\\d{2}).*", "\\1", data_files, perl=T))
+		most_recent <- max(dates)
+		if (today() == most_recent) {
+			return(data_files[which.max(dates)])
+		} else {
+			return(NULL)
+		}
+	}
+}
+```
+
+```{r definir_data, results = 'asis'}
+data_main <- today() - 1
+cat("<p>Dados obtidos em", format(today(), "%d-%m-%Y"), "respeitantes ao período até", format(data_main, "%d-%m-%Y"), "</p>")
+
+data_file <- f.get_data_file(anos_analise)
+doSQL <- is.null(data_file)
+message("doSQL = ", doSQL)
+```
+
+<!-- SQL + processar dados  -->
+
+```{r load_sql, eval = doSQL }
+con <- dbConnect(Oracle(),
+                 dbname = "//10.202.128.133:1521/RNUSIMSNS",
+                 user = "SICOBI", password = "rmx3bL9Hvz")
+
+d.co_normal <- get_query('Queries/co_normal_codificacao.sql', con)
+d.co_fetal <- get_query('Queries/co_fetal_codificacao.sql', con)
+
+d.cm_normal <- get_query('Queries/cm_normal_codificacao.sql', con)
+d.cm_fetal <- get_query('Queries/cm_fetal_codificacao.sql', con)
+
+invisible(dbDisconnect(con))
+```
+
+```{r prep_data, eval = doSQL }
+d.co_normal$TIPO <- "Normal"
+d.cm_normal$TIPO <- "Normal"
+d.co_fetal$TIPO <- "Neonatal / Fetal"
+d.cm_fetal$TIPO <- "Neonatal / Fetal"
+
+d.cod <- rbind(d.co_normal, d.co_fetal)
+d.causas <- rbind(d.cm_normal, d.cm_fetal)
+
+rm(d.co_normal, d.co_fetal, d.cm_normal, d.cm_fetal)
+
+### DATAS
+
+d.cod$ANO <- factor(year(d.cod$DATA_FINAL))
+d.cod$MES <- factor(month(d.cod$DATA_CRIACAO),
+                    levels = 1:12,
+                    labels = c("Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                               "Jul", "Ago", "Set", "Out", "Nov", "Dez"))
+d.cod$DIA <- day(d.cod$DATA_CRIACAO)
+d.cod$DATA_CODIFICADOR <- as.Date(d.cod$DATA_CODIFICADOR)
+
+d.causas$ANO <- factor(year(d.causas$DATA_FINAL))
+d.causas$MES <- factor(month(d.causas$DATA_CRIACAO),
+                       levels = 1:12,
+                       labels = c("Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                                  "Jul", "Ago", "Set", "Out", "Nov", "Dez"))
+d.causas$DIA <- day(d.causas$DATA_CRIACAO)
+
+### UTILIZADOR
+
+d.cod$UTILIZADOR_CODIFICADOR <- factor(d.cod$UTILIZADOR_CODIFICADOR,
+  levels = c("SICO_COD_lucilia.m.cardoso", "SICO_COD_marina.d.ramos",
+             "SICO_COD_ana.silvestre", "SICO_COD_rosa.m.leite",
+             "SICO_COD_maria.tm.raimundo"),
+  labels = c("Lucília", "Marina", "Paula", "Rosa", "Teresa"))
+
+
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES %in% c("Jan", "Abr", "Jul", "Out")] <- "Marina*"
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES %in% c("Fev", "Mai", "Nov")] <- "Lucília"
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES %in% c("Mar", "Set", "Dez")] <- "Teresa"
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES == "Jun" & d.cod$DIA <=20] <- "Teresa"
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES == "Jun" & d.cod$DIA >20] <- "Marina*"
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES == "Ago" & d.cod$DIA <=25] <- "Lucília"
+d.cod$CODIFICADORA[d.cod$ANO == 2014 & d.cod$MES == "Ago" & d.cod$DIA >25] <- "Marina*"
+
+d.cod$CODIFICADORA[d.cod$ANO %in% c(2015, 2016, 2017) & d.cod$MES %in% c("Abr", "Jul", "Out", "Nov")] <- "Marina"
+d.cod$CODIFICADORA[d.cod$ANO %in% c(2015, 2016, 2017) & d.cod$MES %in% c("Fev", "Mai", "Ago")] <- "Lucília"
+d.cod$CODIFICADORA[d.cod$ANO %in% c(2015, 2016, 2017) & d.cod$MES %in% c("Mar", "Jun", "Set")] <- "Teresa"
+d.cod$CODIFICADORA[d.cod$ANO %in% c(2015, 2016, 2017) & d.cod$MES == "Ago" & d.cod$DIA >= 29] <- "Teresa"
+d.cod$CODIFICADORA[d.cod$ANO %in% c(2015, 2016, 2017) & (d.cod$MES == "Jan" | d.cod$MES == "Dez") & d.cod$DIA <=15] <- "Paula"
+d.cod$CODIFICADORA[d.cod$ANO %in% c(2015, 2016, 2017) & (d.cod$MES == "Jan" | d.cod$MES == "Dez") & d.cod$DIA >15] <- "Rosa"
+
+d.cod$CODIFICADORA[d.cod$ANO == 2018 & yday(d.cod$DATA_CRIACAO) %% 3 == 1] <- "Teresa"
+d.cod$CODIFICADORA[d.cod$ANO == 2018 & yday(d.cod$DATA_CRIACAO) %% 3 == 2] <- "Lucília"
+d.cod$CODIFICADORA[d.cod$ANO == 2018 & yday(d.cod$DATA_CRIACAO) %% 3 == 0] <- "Marina"
+
+
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES %in% c("Jan", "Abr", "Jul", "Out")] <- "Marina*"
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES %in% c("Fev", "Mai", "Nov")] <- "Lucília"
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES %in% c("Mar", "Set", "Dez")] <- "Teresa"
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES == "Jun" & d.causas$DIA <=20] <- "Teresa"
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES == "Jun" & d.causas$DIA >20] <- "Marina*"
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES == "Ago" & d.causas$DIA <=25] <- "Lucília"
+d.causas$CODIFICADORA[d.causas$ANO == 2014 & d.causas$MES == "Ago" & d.causas$DIA >25] <- "Marina*"
+
+d.causas$CODIFICADORA[d.causas$ANO %in% c(2015, 2016, 2017) & d.causas$MES %in% c("Abr", "Jul", "Out", "Nov")] <- "Marina"
+d.causas$CODIFICADORA[d.causas$ANO %in% c(2015, 2016, 2017) & d.causas$MES %in% c("Fev", "Mai", "Ago")] <- "Lucília"
+d.causas$CODIFICADORA[d.causas$ANO %in% c(2015, 2016, 2017) & d.causas$MES %in% c("Mar", "Jun", "Set")] <- "Teresa"
+d.causas$CODIFICADORA[d.causas$ANO %in% c(2015, 2016, 2017) & d.causas$MES == "Ago" & d.causas$DIA >= 29] <- "Teresa"
+d.causas$CODIFICADORA[d.causas$ANO %in% c(2015, 2016, 2017) & (d.causas$MES == "Jan" | d.causas$MES == "Dez") & d.causas$DIA <=15] <- "Paula"
+d.causas$CODIFICADORA[d.causas$ANO %in% c(2015, 2016, 2017) & (d.causas$MES == "Jan" | d.causas$MES == "Dez") & d.causas$DIA >15] <- "Rosa"
+
+d.causas$CODIFICADORA[d.causas$ANO == 2018 & yday(d.causas$DATA_CRIACAO) %% 3 == 1] <- "Teresa"
+d.causas$CODIFICADORA[d.causas$ANO == 2018 & yday(d.causas$DATA_CRIACAO) %% 3 == 2] <- "Lucília"
+d.causas$CODIFICADORA[d.causas$ANO == 2018 & yday(d.causas$DATA_CRIACAO) %% 3 == 0] <- "Marina"
+
+d.cod$CODIFICADORA[is.na(d.cod$CODIFICADORA)] <- "Não definido"
+d.causas$CODIFICADORA[is.na(d.causas$CODIFICADORA)] <- "Não definido"
+
+### CODIFICADO?
+
+d.cod$CAUSA_BASICA <- factor(d.cod$COD_DGS_BASICA != "", levels = c(T, F), labels = c("Sim", "Nao"))
+d.cod$CAUSA_BASICA[is.na(d.cod$CAUSA_BASICA)] <- "Nao"
+
+d.causas$CM_DESCRICAO_MEDICO[grepl("^\\W*$", d.causas$CM_DESCRICAO_MEDICO)] <- NA
+
+
+### ALINEAS
+
+d.causas2 <- merge(d.cod[, c("CODIGO_CERTIFICADO_OBITO", "CAUSA_BASICA", "RA", "BIC", "ANO", "MES", "CODIFICADORA")],
+                   d.causas[, !names(d.causas) %in% c("ANO", "MES", "CODIFICADORA")], all.x = TRUE)
+
+d.anc <- ddply(d.causas2, .(ANO, CODIGO_CERTIFICADO_OBITO),
+               summarise,
+               TIPO = TIPO[1],
+               Codificado = (CAUSA_BASICA[1] == "Sim"),
+               RA = (RA[1] == 1),
+               BIC = (BIC[1] == 1),
+               CODIFICADORA = CODIFICADORA[1],
+               NAlineas = sum(!is.na(CM_DESCRICAO_MEDICO)),
+               Missing = all(NAlineas > 0 & is.na(CM_CODIFICACAO_DGS)))
+```
+
+```{r plot_data, eval = doSQL }
+ultima_data <- max(d.cod$DATA_CODIFICADOR, na.rm = TRUE)
+
+d.cod2 <- subset(d.cod, !is.na(UTILIZADOR_CODIFICADOR) &
+                       DATA_CODIFICADOR >= as.Date("2015-09-01") &
+                       DATA_CODIFICADOR <= ultima_data)
+
+# Por codificadora
+d.plot <- ddply(d.cod2, .(DATA_CODIFICADOR, UTILIZADOR_CODIFICADOR, ANO),
+                summarise, N = length(CODIGO_CERTIFICADO_OBITO))
+
+d.plot_label <- ddply(d.cod2, .(DATA_CODIFICADOR, UTILIZADOR_CODIFICADOR),
+                summarise, N = length(CODIGO_CERTIFICADO_OBITO))
+d.plot_label$Label[d.plot_label$N > 0] <- d.plot_label$N[d.plot_label$N > 0]
+d.plot_label$N <- NA
+
+# Total
+d.plot_total <- ddply(d.cod2, .(DATA_CODIFICADOR, ANO),
+                      summarise, N = length(CODIGO_CERTIFICADO_OBITO))
+d.plot_total$UTILIZADOR_CODIFICADOR <- "Total"
+d.plot_total_label <- ddply(d.cod2, .(DATA_CODIFICADOR),
+                            summarise, N = length(CODIGO_CERTIFICADO_OBITO))
+d.plot_total_label$UTILIZADOR_CODIFICADOR <- "Total"
+d.plot_total_label$Label[d.plot_total_label$N > 0] <- d.plot_total_label$N[d.plot_total_label$N > 0]
+d.plot_total_label$N <- NA
+
+d.plot_media <- ddply(d.plot_label, .(UTILIZADOR_CODIFICADOR),
+                      summarise, Media = mean(Label))
+
+d.plot <- rbind.fill(d.plot, d.plot_label, d.plot_media)
+d.plot_total <- rbind.fill(d.plot_total, d.plot_total_label)
+d.plot$ANO <- droplevels(d.plot$ANO)
+d.plot_total$ANO <- droplevels(d.plot_total$ANO)
+
+d.cod <- subset(d.cod, ANO %in% anos_analise)
+d.causas <- subset(d.causas, ANO %in% anos_analise)
+d.causas2 <- subset(d.causas2, ANO %in% anos_analise)
+d.anc <- subset(d.anc, ANO %in% anos_analise)
+```
+
+```{r save_data, eval = doSQL }
+save(list = c(ls(pat = "^d\\."), "ultima_data"),
+     file = paste0('Codificacao_', paste(anos_analise, collapse = "-"), "_", Sys.Date(), '.RData'))
+```
+
+<!--  Ler dados de ficheiro -->
+
+```{r load_data, eval = !doSQL }
+load(data_file)
+```
+
+<!-- Outputs -->
+
+```{r plot, warning = FALSE, fig.height = 9, fig.width = 9, results = 'hide' }
+date_format2 <- function(format = "%Y-%m-%d", tz = "UTC") {
+  function(x) {
+    wd <- toupper(substr(format(x, "%a", tz = tz), 1, 1))
+    mo <- format(x, "%b", tz = tz)
+    mo[day(x) != 1] <- ""
+    paste(mo, wd)
+  }
+}
+
+# Weekends
+first_date <- min(d.plot$DATA_CODIFICADOR, na.rm = TRUE)
+last_date <- max(d.plot$DATA_CODIFICADOR, na.rm = TRUE)
+first_sat <- first_date + 7 - wday(first_date)
+sats <- seq(first_sat, last_date, by = 7)
+last_sat <- max(sats)
+suns <- seq(first_sat + 1, last_sat + 1, by = 7)
+d.weekends <- data.frame(xmin = sats - 0.5, xmax = suns + 0.5)
+
+p1 <- ggplot(d.plot, aes(fill = UTILIZADOR_CODIFICADOR, alpha = ANO)) +
+#  geom_hline(aes(yintercept = Media), colour = "red", alpha = 1, linetype = "dashed") +
+  geom_rect(data = d.weekends,
+            aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = max(d.plot$N, na.rm = TRUE) * 1.5),
+            alpha = 0.2, fill = "#949494") +
+  geom_bar(aes(x = DATA_CODIFICADOR, y = N), stat = "identity", position = "stack") +
+  geom_text(aes(x = DATA_CODIFICADOR, y = Label, label = Label, colour = UTILIZADOR_CODIFICADOR), show.legend = FALSE, angle = 90, size = 3, hjust = -0.2) +
+  facet_grid(UTILIZADOR_CODIFICADOR~.) +
+  scale_colour_discrete(guide = "none") +
+  scale_fill_discrete(guide = "none") +
+  scale_alpha_manual(values = seq(0.4, 1, length.out = nlevels(d.plot$ANO))) +
+  scale_x_date(date_breaks = "days", labels = date_format2(), limits = c(last_date - 7 * 7, last_date + 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+#        axis.ticks.margin = unit(0, "lines"),
+        plot.margin = unit(c(1, 1, 0, 0.5), "lines"),
+        legend.position = "none") +
+  labs(title = paste("Codificação até", ultima_data))
+
+p2 <- ggplot(d.plot_total, aes(fill = UTILIZADOR_CODIFICADOR, alpha = ANO)) +
+#  geom_hline(aes(yintercept = Media), colour = "red", alpha = 1, linetype = "dashed") +
+  geom_rect(data = d.weekends,
+            aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = max(d.plot_total$N, na.rm = TRUE) * 2),
+            alpha = 0.2, fill = "#949494") +
+  geom_bar(aes(x = DATA_CODIFICADOR, y = N), stat = "identity", position = "stack") +
+  geom_text(aes(x = DATA_CODIFICADOR, y = Label, label = Label, colour = UTILIZADOR_CODIFICADOR), show.legend = FALSE, angle = 90, size = 3, hjust = -0.2) +
+  facet_grid(UTILIZADOR_CODIFICADOR~.) +
+  scale_colour_discrete(guide = "none") +
+  scale_fill_discrete(guide = "none") +
+  scale_alpha_manual(values = seq(0.4, 1, length.out = nlevels(d.plot_total$ANO))) +
+  scale_x_date(date_breaks = "days", labels = date_format2(), limits = c(last_date - 7 * 7, last_date + 1)) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        plot.margin = unit(c(0, 1, 0.5, 0.3), "lines"), # top, right, bottom, left
+        legend.position = "bottom")
+
+cod_plot <-  arrangeGrob(p1, p2,
+                        layout_matrix = matrix(c(rep(1, 9), 2, 2, 2, 2), ncol = 1))
+
+grid.arrange(cod_plot)
+pdf(file = paste0("Codificacao_", ultima_data, ".pdf"), width = 9.483, height = 7.874)
+grid.arrange(cod_plot)
+dev.off()
+```
+
+
+# Por mês de emissão do CO
+
+```{r results = 'asis' }
+f.stat_mes()
+```
+
+# Por codificadora
+
+```{r results = 'asis' }
+f.stat_cod()
+```
+
+# Alíneas
+
+Alíneas de CO já codificados com causa básica, em que o médico escreveu nas alíneas mas em que essas alíneas não têm código:
+
+```{r }
+f.alineas()
+```
+
+
+# Evolução ao ritmo actual
+
+_Atenção: estas previsões assumem que as taxas de codificação serão constantes ao longo do ano, o que pode não ser verdade._
+
+## Previsão com base no ritmo de trabalho dos últimos seis meses
+
+```{r frac_cod}
+fc <- f.frac_cod()
+```
+
+### Global
+
+```{r fig.height = 4, warning = FALSE}
+f.plot_pred_global(fc)
+```
+
+### Por codificadora
+
+```{r fig.height = 9, warning = FALSE}
+f.plot_pred_cod(fc)
+```
+
+## Previsão com base no ritmo de trabalho dos últimos dois meses
+
+### Global
+
+```{r fig.height = 4, warning = FALSE}
+f.plot_pred_global(fc)
+```
+
+### Por codificadora
+
+```{r fig.height = 9, warning = FALSE}
+f.plot_pred_cod(fc)
+```
+
+
+
+
+# Detalhes dos CO por codificar
+
+## Número de alíneas preenchidas pelo médico
+
+```{r fig.height = 9, warning = FALSE}
+f.plot_alineas()
+```
+
+## Número de CO com BIC ou relatório de autópsia associado
+
+```{r fig.height = 7, warning = FALSE}
+f.plot_bic_ra()
+```
+
+
+```{r eval = FALSE }
+# Zero alínas, Dez-2015
+write.csv2(
+merge(
+      subset(d.causas2[, c("CODIGO_CERTIFICADO_OBITO", "ANO", "MES")], ANO == 2015 & MES == "Dez")[1],
+      subset(d.anc, Codificado == FALSE & NAlineas == 0)[1]
+),
+          file = "Zero_Alineas_Dez2015.csv", row.names = FALSE)
+```
+

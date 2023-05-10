@@ -1,0 +1,37 @@
+---
+title: "Introdução"
+---
+
+## Apresentação
+
+O Curso Data Science with R in Healthcare é uma formação promovida pela NOVA Saúde Pública, em parceria com a ENSP-NOVA. Nesta formação poderá aprender a utilizar as potencialidades de software R Studio, desde a importação de dados, criação de modelos, gráficos e tabelas prontas para publicação. Adicionalmente, aprenderá como trabalhar em ambiente colaborativo e compartilhar seu código, automatizar relatórios e partilhá-los em HTML ou Word, criar de dashboards e utilizar o GitHub para controlo de versões. Estas ferramentas de Data Science podem aumentar a sua produtividade e eficiência para profissionais que, de forma rotineira, têm de analisar dados e servir de base para aprofundar conhecimentos em machine learning e inteligência articifial.
+
+## Plano curricular
+
+O curso tem uma totalidade de 18,5 horas, divididas pelos seguintes temas:
+
+-   Introdução ao R
+
+-   Manipulação de dados
+
+-   Visualização de dados
+
+-   Construção de modelos
+
+-   Relatórios e dashboards dinâmicos
+
+-   ChatGPT4 como apoio
+
+-   Introdução ao GitHib
+
+# Coordenação
+
+![](photo_bio.jpg){fig-align="left" width="208"}
+
+**André Peralta-Santos** Professor assistente convidado na Escola Nacional de Saúde Pública. PhD em Health Metrics and Implementation Science pela University of Washinton, EUA, onde fez investigação em avaliação de políticas de saúde e COVID-19. Médico de formação e especialista em Saúde Publica, foi Diretor de Informação e Análise da Direção Geral de Saúde em 2020-2021 onde introduziu métodos de Data Science em R. Mestre em medicina pela Nova Medical School, Mestre em Saúde Pública pela ENSP- NOVA, formação em epidemiologia pela Harvard Medical School.
+
+## Licença
+
+[![Creative Commons License](https://licensebuttons.net/l/by-sa/4.0/88x31.png){alt="Creative Commons License"}](https://creativecommons.org/licenses/by-sa/4.0/)
+
+Licença [Creative Commons Attribution-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-sa/4.0/). Visitar [aqui](https://github.com/rstudio-education/datascience-box/blob/master/LICENSE.md) este trabalho é para uso exclusivo no curso. Os alunos não podem partilhar o conteúdo com terceiros mas podem adaptar o código para fins proprios. 

@@ -1,0 +1,51 @@
+---
+author: DSIA
+date: '`r format(Sys.Date())`'
+title: SCRIPT_INSA
+output: html_document
+---
+
+  
+```{r}
+library(data.table)
+
+
+rm(list = ls())
+df <- file.info(list.files("data/bisinave/", full.names = T)) ###EF mudar para reinf
+last_file <- rownames(df)[which.max(df$mtime)]
+
+raw_data <- fread(last_file, encoding = "UTF-8", fill = TRUE, sep = ",") ###
+
+
+```
+
+
+```{r}
+data <- janitor::clean_names(raw_data)
+
+date <- format(Sys.Date(), "%Y%m%d")
+
+setDT(data)
+data <- data[, .(data_de_positividade, data_nascimento_utente)][, ':=' (data_de_positividade = as.Date(data_de_positividade, "%d/%m/%Y"),
+                                                                        data_nascimento_utente = as.Date(data_nascimento_utente, "%d/%m/%Y"))][complete.cases(data)][,':='( age = difftime(data_de_positividade,data_nascimento_utente,units="days")/365)][, age := as.numeric(age)][age >= 60 & data_de_positividade >= "2021-10-01"][, ':='(positividade_week = format(data_de_positividade, "%G-W%V"),positividade_month = format(data_de_positividade, "%Y-%m"))]
+
+
+
+data_week <- data[data_de_positividade >= "2021-10-04"][, .N, by = .(positividade_week)][order(positividade_week)]
+
+data_month <- data[data_de_positividade >= "2021-10-04"][, .N, by = .(positividade_month)][order(positividade_month)]
+
+
+
+fwrite(data_week, 
+       here::here("outputs", 
+                  paste0("data_week_", date,".csv")))
+
+fwrite(data_month, 
+       here::here("outputs", 
+                  paste0("data_week_", date,".csv")))
+
+
+``` 
+
+

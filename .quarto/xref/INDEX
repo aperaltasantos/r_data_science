@@ -1,0 +1,14 @@
+{
+  "index.qmd": {
+    "index.html": "f8e06ed6"
+  },
+  "about.qmd": {
+    "about.html": "911aa3fb"
+  },
+  "install_r.qmd": {
+    "install_r.html": "510464ae"
+  },
+  "exercises.qmd": {
+    "exercises.html": "fd399833"
+  }
+}

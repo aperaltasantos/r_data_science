@@ -1,0 +1,5 @@
+"0","d.co_normal <- get_query('Queries/co_normal_codificacao.sql', con)
+"
+"2","Error in get_query(""Queries/co_normal_codificacao.sql"", con) : 
+  could not find function ""get_query""
+"

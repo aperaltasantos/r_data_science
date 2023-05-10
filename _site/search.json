@@ -1,0 +1,51 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Introdução",
+    "section": "",
+    "text": "O Curso Data Science with R in Healthcare é uma formação promovida pela NOVA Saúde Pública, em parceria com a ENSP-NOVA. Nesta formação poderá aprender a utilizar as potencialidades de software R Studio, desde a importação de dados, criação de modelos, gráficos e tabelas prontas para publicação. Adicionalmente, aprenderá como trabalhar em ambiente colaborativo e compartilhar seu código, automatizar relatórios e partilhá-los em HTML ou Word, criar de dashboards e utilizar o GitHub para controlo de versões. Estas ferramentas de Data Science podem aumentar a sua produtividade e eficiência para profissionais que, de forma rotineira, têm de analisar dados e servir de base para aprofundar conhecimentos em machine learning e inteligência articifial."
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "Programa",
+    "section": "",
+    "text": "Horas\nTemas\n\n\n\n\n08h30-09h00\nReceção e boas-vindas\n\n\n09h00-12h30\nIntrodução ao R\nIniciar um projeto em R\nBoas práticas em programação\nQuarto | Markdown\nTipos de Dados\nImportar Dados\n\n\n12h30-14h00\nPausa Almoço\n\n\n14h00-15h00\nManipulação de variáveis com Tidyverse\nFiltrar, selecionar, criar e renomear variáveis\n\n\n15h00-15h15\nCoffee Break\n\n\n16h30-17h30\nManipulação de variáveis com Tidyverse (continuação)\nAgrupar, sumarizar, e operações complexas\n\n\n17h30\nFim do dia 1"
+  },
+  {
+    "objectID": "index.html#licença",
+    "href": "index.html#licença",
+    "title": "Introdução",
+    "section": "Licença",
+    "text": "Licença\n\n\n\nCreative Commons License\n\n\nLicença Creative Commons Attribution-ShareAlike 4.0 International. Visitar aqui este trabalho é para uso exclusivo no curso. Os alunos não podem partilhar o conteúdo com terceiros mas podem adaptar o código para fins proprios."
+  },
+  {
+    "objectID": "index.html#plano-curricular",
+    "href": "index.html#plano-curricular",
+    "title": "Introdução",
+    "section": "Plano curricular",
+    "text": "Plano curricular\nO curso tem uma totalidade de 18,5 horas, divididas pelos seguintes temas:\n\nIntrodução ao R\nManipulação de dados\nVisualização de dados\nConstrução de modelos\nRelatórios e dashboards dinâmicos\nChatGPT4 como apoio\nIntrodução ao GitHib"
+  },
+  {
+    "objectID": "about.html#dia-2",
+    "href": "about.html#dia-2",
+    "title": "Programa",
+    "section": "DIA 2",
+    "text": "DIA 2\n\n\n\n\n\n\n\nHoras\nTemas\n\n\n\n\n08h30-09h00\nReceção\n\n\n09h00-12h30\nVisualização de dados\nIntrodução ao ggplot2\n\n\n12h30-14h00\nPausa Almoço\n\n\n14h00-15h00\nVisualização de dados (continuação)\nTime-series\nBar charts\nScaterplots\nMapas\nTabelas e modelos\nTabelas estáticas e dinâmicas\nRegressão Linear\nRegressão Logística\nVisualização de modelos\n\n\n15h00-15h15\nCoffee Break\n\n\n16h30-17h30\nExercícios de visualização de dados\n\n\n17h30\nFim do dia 2"
+  },
+  {
+    "objectID": "about.html#dia-3",
+    "href": "about.html#dia-3",
+    "title": "Programa",
+    "section": "DIA 3",
+    "text": "DIA 3\n\n\n\n\n\n\n\nHoras\nTemas\n\n\n\n\n08h30-09h00\nReceção\n\n\n09h00-12h30\nApoio com ChatGPT 4\nRevisão de código\nDocumentação de código\nRelatórios dinâmicos\nProdução de documentos word, html e pdf em Quarto\nPublicação de resultados no QuartoPubs\n\n\n12h30-14h00\nPausa Almoço\n\n\n14h00-15h00\nDashboards\nShiny App ou Flexdashboards\nGitHub\nIntegração GitHub com R\nPull, Push, Commit\n\n\n15h00-15h15\nCoffee Break\n\n\n16h30-17h30\nAvaliações\n\n\n17h30\nFim do dia 3"
+  },
+  {
+    "objectID": "install_r.html",
+    "href": "install_r.html",
+    "title": "Instalar o R e RStudio",
+    "section": "",
+    "text": "Visite o site do CRAN (Comprehensive R Archive Network) no link: https://cran.r-project.org/. Clique em “Download R for Windows” na seção “Download and Install R”.\nClique em “base” na página seguinte.\nFaça o download do arquivo “R-x.x.x-win.exe” (onde x.x.x é a versão mais recente). Execute o arquivo para iniciar o instalador.\nSiga as instruções do instalador, escolhendo as configurações desejadas e clicando em “Next” até concluir a instalação.\n\n\n\nVisite o site do CRAN em: https://cran.r-project.org/.\nClique em “Download R for (Mac) OS X” na seção “Download and Install R”.\nFaça o download do arquivo “R-x.x.x.pkg” (onde x.x.x é a versão mais recente) na seção “Latest Release”.\nExecute o arquivo para iniciar o instalador.\nSiga as instruções do instalador, escolhendo as configurações desejadas e clicando em “Continue” até concluir a instalação."
+  }
+]

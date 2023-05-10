@@ -1,0 +1,24 @@
+project:
+  type: website
+
+website:
+  title: "Data Science with R"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Introdução
+      - href: about.qmd
+        text: Programa
+      - href: install_r.qmd
+        text: Instalar R
+      - href: exercises.qmd
+        text: Exercicios
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+
+editor: visual
+
