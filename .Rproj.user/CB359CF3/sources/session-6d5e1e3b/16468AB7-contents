@@ -11,8 +11,7 @@ website:
         text: Programa
       - href: install_r.qmd
         text: Instalar R
-      - href: exercises.qmd
-        text: Exercicios
+
 
 format:
   html:

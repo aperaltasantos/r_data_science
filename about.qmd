@@ -15,7 +15,7 @@ title: "Programa"
 |             |                                                           |
 |             | Boas práticas em programação                              |
 |             |                                                           |
-|             | Quarto \| Markdown                                        |
+|             | Quarto | Markdown                                        |
 |             |                                                           |
 |             | Tipos de Dados                                            |
 |             |                                                           |

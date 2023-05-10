@@ -1,0 +1,43 @@
+---
+title: "Instalar o R e RStudio"
+---
+
+# Instalar o R
+
+![](figures/Picture1.png){width="485"}
+
+## Windows
+
+Visite o site do CRAN (Comprehensive R Archive Network) no [link](https://cran.r-project.org/): https://cran.r-project.org/. Clique em "Download R for Windows" na seção "Download and Install R".
+
+Clique em "base" na página seguinte.
+
+Faça o download do arquivo "R-x.x.x-win.exe" (onde x.x.x é a versão mais recente). Execute o arquivo para iniciar o instalador.
+
+Siga as instruções do instalador, escolhendo as configurações desejadas e clicando em "Next" até concluir a instalação.
+
+## macOS
+
+Visite o site do CRAN em: https://cran.r-project.org/.
+
+Clique em "Download R for (Mac) OS X" na seção "Download and Install R".
+
+Faça o download do arquivo "R-x.x.x.pkg" (onde x.x.x é a versão mais recente) na seção "Latest Release".
+
+Execute o arquivo para iniciar o instalador.
+
+Siga as instruções do instalador, escolhendo as configurações desejadas e clicando em "Continue" até concluir a instalação.
+
+# Instalação do RStudio no Windows e macOS
+
+![](figures/pic_3.png){width="480"}
+
+Visite o site do RStudio [aqui](https://posit.co/download/rstudio-desktop/) : https://posit.co/download/rstudio-desktop/.
+
+Clique no hiperlink Download RStudio . Escolha o instalador apropriado para o seu sistema operacional (Windows ou macOS).
+
+Faça o download do arquivo do instalador e execute-o.
+
+Siga as instruções do instalador, escolhendo as configurações desejadas e clicando em "Next" (Windows) ou "Continue" (macOS) até concluir a instalação.
+
+Depois de instalar o R e o RStudio, pode começar a usar o ambiente de desenvolvimento integrado (IDE) do RStudio para criar e executar scripts R. **Lembre-se de que o R deve ser instalado antes do RStudio, o RStudio depende do R para funcionar corretamente.**

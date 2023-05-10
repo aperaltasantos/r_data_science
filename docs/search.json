@@ -40,12 +40,5 @@
     "title": "Introdução",
     "section": "Licença",
     "text": "Licença\n\n\n\nCreative Commons License\n\n\nLicença Creative Commons Attribution-ShareAlike 4.0 International. Visitar aqui este trabalho é para uso exclusivo no curso. Os alunos não podem partilhar o conteúdo com terceiros mas podem adaptar o código para fins proprios."
-  },
-  {
-    "objectID": "install_r.html",
-    "href": "install_r.html",
-    "title": "Instalar o R e RStudio",
-    "section": "",
-    "text": "Visite o site do CRAN (Comprehensive R Archive Network) no link: https://cran.r-project.org/. Clique em “Download R for Windows” na seção “Download and Install R”.\nClique em “base” na página seguinte.\nFaça o download do arquivo “R-x.x.x-win.exe” (onde x.x.x é a versão mais recente). Execute o arquivo para iniciar o instalador.\nSiga as instruções do instalador, escolhendo as configurações desejadas e clicando em “Next” até concluir a instalação.\n\n\n\nVisite o site do CRAN em: https://cran.r-project.org/.\nClique em “Download R for (Mac) OS X” na seção “Download and Install R”.\nFaça o download do arquivo “R-x.x.x.pkg” (onde x.x.x é a versão mais recente) na seção “Latest Release”.\nExecute o arquivo para iniciar o instalador.\nSiga as instruções do instalador, escolhendo as configurações desejadas e clicando em “Continue” até concluir a instalação."
   }
 ]
