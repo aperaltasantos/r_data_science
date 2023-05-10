@@ -1,5 +1,6 @@
 project:
   type: website
+  output-dir: docs
 
 website:
   title: "Data Science with R"
@@ -11,8 +12,7 @@ website:
         text: Programa
       - href: install_r.qmd
         text: Instalar R
-      - href: exercises.qmd
-        text: Exercicios
+
 
 format:
   html:
